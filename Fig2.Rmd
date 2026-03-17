@@ -9,6 +9,9 @@ output:
 ---
 
 ```{r setup}
+# Biologist note:
+# This setup block loads the full metadata-annotated UMAP table,
+# and defines shared visual themes used across all Figure 2 panels.
 
 rm(list=ls())
 
@@ -61,6 +64,9 @@ names(all_vals) =  c("GTEx","TCGA-GBM", "TCGA-LGG","CGGA", "CBTN")
 ```
 # Fig 2 - TCGA figures
 ```{r}
+# Biologist note:
+# Main Figure 2 focuses on TCGA glioma samples only.
+# We overlay subtype, clinical, chromosome events, and mutation status on UMAP.
 # work with only gliomas
 tsne_data1 = umap_data1[which(umap_data1$group %in% c("TCGA-LGG", "TCGA-GBM")), ]
 tsne_data1 = tsne_data1[-c(which(tsne_data1$tumor_type == "TCGA-GBM-Matched-Normal")), ]
@@ -202,6 +208,9 @@ dev.off()
 #  Supp Fig 2 - supplemental figures for only TCGA
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 2 expands TCGA-only overlays for additional covariates,
+# including sex, methylation/transcriptome classes, and promoter statuses.
 
 
 mat$gender[ which(is.na(mat$gender)) ] ="Not available"

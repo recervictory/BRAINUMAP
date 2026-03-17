@@ -10,6 +10,9 @@ output:
 
 
 ```{r}
+# Biologist note:
+# This setup chunk loads the batch-corrected expression matrix and metadata,
+# aligning sample order so pathway analysis uses the correct labels per sample.
 rm(list=ls())
 
 library(SummarizedExperiment)
@@ -36,6 +39,9 @@ big_mat = big_mat[, match(finaldf$rnaseq_sampleName, colnames(big_mat)) ]
 # calculate GSVA IDH-WT vs GTEx
 
 ```{r}
+# Biologist note:
+# Compare pathway activity between IDH-WT glioma and GTEx controls using GSVA.
+# Significant pathways are separated into up/down sets by effect size and adjusted p-value.
 midx = which(finaldf$tumor_type %in% c("TCGA-IDH-WT", "CGGA-IDH-WT" , "GTEX"))
 my_mat = big_mat[, midx]
 groups = finaldf$tumor_type[midx]
@@ -84,6 +90,8 @@ if(length(up_reg)!=0 & length(down_reg)!=0){
 # calculate GSVA IDH-Mutant vs GTEx
 
 ```{r}
+# Biologist note:
+# Same GSVA workflow as above, but for IDH-mutant glioma vs GTEx controls.
 midx = which(finaldf$tumor_type %in% c("TCGA-IDH-Mutant", "CGGA-IDH-Mutant" , "GTEX"))
 
 my_mat = big_mat[, midx]
@@ -133,6 +141,8 @@ if(length(up_reg)!=0 & length(down_reg)!=0){
 # calculate GSVA Oligodendroglioma vs GTEx
 
 ```{r}
+# Biologist note:
+# Same GSVA workflow as above, but for oligodendroglioma vs GTEx controls.
 midx = which(finaldf$tumor_type %in% c("TCGA-Oligo", "CGGA-Oligo" , "GTEX"))
 my_mat = big_mat[, midx]
 groups = finaldf$tumor_type[midx]
@@ -180,6 +190,9 @@ if(length(up_reg)!=0 & length(down_reg)!=0){
 
 # venn diagram
 ```{r}
+# Biologist note:
+# This chunk summarizes overlap of significantly up-regulated pathways
+# across IDH-WT, IDH-Mutant, and Oligo comparisons.
 library(readxl)
 wt_up = read_xlsx("sig_pathways_GTEXvsIDHWT.xlsx", sheet = 2)
 oligo_up = read_xlsx("sig_pathways_GTEXvsOligo.xlsx", sheet = 2)
@@ -223,6 +236,9 @@ lst = list(wt_path, mut_path, oligo_path)
 # Fig 5
 
 ```{r}
+# Biologist note:
+# Figure 5 overlays selected biological pathway scores on UMAP,
+# helping interpret spatial regions in terms of biological programs.
 rm(list=ls())
 
 library(ggplot2)
@@ -311,6 +327,8 @@ dev.off()
 ## Supp Fig 5a - Plot interesting pathways from Adult Top 100 
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 5A plots additional pathways prioritized from adult-glioma results.
 want = c(
   "REACTOME_TRNA_PROCESSING_IN_THE_MITOCHONDRION",  
   "REACTOME_ANTIGEN_PRESENTATION_FOLDING_ASSEMBLY_AND_PEPTIDE_LOADING_OF_CLASS_I_MHC",
@@ -355,6 +373,8 @@ dev.off()
 ## Supp Fig 5b  -  Plot interesting pathways from Pediatric & GTEx top 100 
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 5B plots pathways prioritized from pediatric/GTEx-focused results.
 want1 = c(
  "REACTOME_DIGESTION_OF_DIETARY_CARBOHYDRATE",  
   "REACTOME_PRESYNAPTIC_DEPOLARIZATION_AND_CALCIUM_CHANNEL_OPENING", 
@@ -394,6 +414,9 @@ dev.off()
 
 ## Supp Fig 5c  -  olfactory 
 ```{r}
+# Biologist note:
+# Supplemental Figure 5C highlights olfactory and related pathways
+# that show distinctive spatial patterns in the map.
 want = c(  "REACTOME_OLFACTORY_SIGNALING_PATHWAY", 
   "KEGG_ASCORBATE_AND_ALDARATE_METABOLISM", 
         #"KEGG_AUTOIMMUNE_THYROID_DISEASE",

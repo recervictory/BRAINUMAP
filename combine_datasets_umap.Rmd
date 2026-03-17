@@ -9,6 +9,10 @@ output:
 ---
 
 ```{r setup}
+# Biologist note:
+# This setup block loads the adult-brain expression matrix and the CBTN matrix,
+# keeps only genes shared between datasets, then creates one combined matrix.
+# It also applies ComBat to reduce technical batch effects before visualization.
 rm(list=ls())
 library(SummarizedExperiment)
 library(umap)
@@ -61,6 +65,9 @@ saveRDS(combat_edata1, file.path(resdir, "data","log2_tpm_combatseq_cbtn_brain_u
 # All together without batch correction
 
 ```{r}
+# Biologist note:
+# Here we build the baseline map WITHOUT batch correction.
+# We calculate UMAP (2D and 3D), PCA, and tSNE, then save coordinates for plotting.
 # old code - by default gives only umap in 2d. 
 umap_out <- umap(t(mat1), random_state = 123, min_dist = 0.5) # Run UMAP
 umap_2d = umap_out$layout
@@ -97,6 +104,9 @@ write.table(umap_data1, file.path(resdir,"tables", "no_batch_correction_umapdata
 # UMAP :  ALL TOGETHER (with batch correction)
 
 ```{r}
+# Biologist note:
+# This is the main BRAIN-UMAP build WITH ComBat batch correction.
+# Output table from this chunk is the central coordinate file used by most figure scripts.
 # by default gives only umap in 2d. 
 umap_out <- umap(t(combat_edata1), random_state = 123, min_dist = 0.5) # Run UMAP
 umap_2d = umap_out$layout
@@ -132,6 +142,9 @@ as.data.frame(table(umap_data1$group))
 # UMAP : gtex & cbtn (with batch correction)
 
 ```{r}
+# Biologist note:
+# This chunk creates a subset map for normal brain controls (GTEx) and pediatric tumors (CBTN).
+# It is used to study tumor-to-normal proximity in reduced-dimensional space.
 gtex_idx  = which(group %in% c("GTEX", "CBTN"))
 sub_edata1= combat_edata1[ , gtex_idx]
 sub_group = group[gtex_idx]
@@ -172,6 +185,9 @@ as.data.frame(table(umap_data1$group))
 # UMAP : TCGA  & cbtn (with batch correction)
 
 ```{r}
+# Biologist note:
+# This chunk creates a subset map for adult glioma cohorts (TCGA-GBM/TCGA-LGG) plus CBTN.
+# It supports direct pediatric-versus-adult tumor comparisons.
 gtex_idx  = which(group %in% c("TCGA-GBM","TCGA-LGG",  "CBTN"))
 sub_edata1= combat_edata1[ , gtex_idx]
 sub_group = group[gtex_idx]
@@ -217,6 +233,9 @@ as.data.frame(table(umap_data1$group))
 
 # create a sample map between rna-seq and WGS data 
 ```{r}
+# Biologist note:
+# This creates a lookup table linking RNA-seq biospecimen IDs to WGS biospecimen IDs.
+# It is needed when integrating transcriptomic and genomic (mutation/fusion) analyses.
 df  = read.delim("~/HollandLabShared/Sonali/OpenPBTA-analysis/data/release-v19-20210423/pbta-histologies.tsv", 
                  header=T, stringsAsFactors=FALSE)
 
@@ -238,6 +257,9 @@ write.table(ans_df, file.path(resdir, "tables", "sample_map.txt"), sep ="\t",
 
 # Add metadata to UMAP 
 ```{r}
+# Biologist note:
+# This final step adds selected metadata columns to subset UMAP tables.
+# It includes sanity checks to ensure sample ordering and coordinates stayed consistent.
 rm(list=ls())
 resdir= "~/HollandLabShared/Sonali/MultiDisease_Paper/analysis/test_Dec_2022/tables"
 setwd(resdir)

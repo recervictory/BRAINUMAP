@@ -10,6 +10,9 @@ output:
 
 
 ```{r}
+# Biologist note:
+# This setup chunk defines pediatric/adult color dictionaries and plotting theme,
+# then prepares the workspace used for Figure 4 disease-level visualizations.
 rm(list=ls())
 
 library(grid)
@@ -82,6 +85,8 @@ names(gtex_vals) = "GTEx"
 # fig 4a 
 
 ```{r}
+# Biologist note:
+# Figure 4A: map only CBTN samples and color by pediatric diagnosis class.
 # only CBTN 
 only_cbtn= read.delim(file.path("tables", only_cbtn_fls), header=T, stringsAsFactors = FALSE)
 only_cbtn$disease[which(only_cbtn$tumor_type=="ATRT")]="Atypical Teratoid Thadoid Tumors (ATRT)"
@@ -110,6 +115,9 @@ p1 = ggplot(only_cbtn, aes(UMAP1_2d, UMAP2_2d, color=disease )) +
 # Fig 4B : BRAIN-UMAP  
 
 ```{r}
+# Biologist note:
+# Figure 4B: build the full BRAIN-UMAP disease map by combining
+# adult subtype relabeling with pediatric diagnosis relabeling.
 umap_data1 = read.delim("tables/umapdata_with_CBTN_8_27_2021_with_metadata.txt", header=T, stringsAsFactors = FALSE)
 
 umap_data1$group = as.character(umap_data1$group )
@@ -170,6 +178,9 @@ dev.off()
 
 # supp fig 4  - epn / medullo subtype
 ```{r}
+# Biologist note:
+# Supplemental Figure 4 shows finer pediatric subtype structure,
+# specifically ependymoma subgroups and medulloblastoma molecular subtypes.
 umap_data1 = read.delim("tables/umapdata_with_CBTN_8_27_2021_with_metadata.txt", header=T, stringsAsFactors = FALSE)
 library(readxl)
 info  = read_xlsx("~/HollandLabShared/Sonali/MultiDisease_Paper/analysis/CBTN/subset_rnaseq_sample_info.xlsx")
@@ -224,6 +235,9 @@ dev.off()
 # supp fig 4c
 
 ```{r}
+# Biologist note:
+# This supplemental chunk focuses on GTEx+CBTN view,
+# with one panel for broad groups and one panel for pediatric diagnosis detail.
 with_tcga_fls ="umapdata_TCGA_with_CBTN_8_27_2021with_metadata.txt"
 with_gtex_fls= "umapdata_GTEX_with_CBTN_8_27_2021with_metadata.txt"
 only_cbtn_fls = "umapdata_only_CBTN_8_27_2021with_metadata.txt"

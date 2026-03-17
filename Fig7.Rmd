@@ -12,6 +12,9 @@ output:
 # frequency of Mutations
 
 ```{r setup}
+# Biologist note:
+# This setup chunk prepares mutation, fusion, copy-number, and expression inputs,
+# then computes burden-style overlays for Figure 7.
 rm(list=ls())
 
 library(grid)
@@ -187,6 +190,9 @@ gene_fusion_freq =  ggplot(umap_data1, aes(UMAP1_2d, UMAP2_2d, color=fusion_Freq
 # supp fig 4c
 
 ```{r}
+# Biologist note:
+# Figure 7 combines disease-map context with genomic burden overlays
+# (mutation count, fusion count, and copy-number gain/loss burden).
 resdir = "~/HollandLabShared/Sonali/MultiDisease_Paper/analysis/test_Dec_2022"
 with_tcga_fls ="umapdata_TCGA_with_CBTN_8_27_2021with_metadata.txt"
 with_gtex_fls= "umapdata_GTEX_with_CBTN_8_27_2021with_metadata.txt"
@@ -274,6 +280,9 @@ dev.off()
 # boxplot showing frequency of gene fusions
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 7 summarizes per-sample mutation and fusion burdens
+# as boxplots stratified by tumor type.
 
 library(ggplot2)
 library(scales)

@@ -10,6 +10,9 @@ output:
 
 
 ```{r setup}
+# Biologist note:
+# This setup block defines common plot style, colors, and font sizes,
+# then loads the metadata-annotated UMAP table used for Figure 1 panels.
 
 rm(list=ls())
 
@@ -64,6 +67,8 @@ names(all_vals) =  c("GTEx","TCGA-GBM", "TCGA-LGG","CGGA", "CBTN")
 # Fig 1a 
 
 ```{r}
+# Biologist note:
+# Figure 1A: color all samples by cohort/source dataset to show global structure of BRAIN-UMAP.
 umap_data1$group = gsub("GTEX", "GTEx", umap_data1$group)
 umap_data1$group = factor(umap_data1$group , levels = names(all_vals))
 
@@ -83,6 +88,9 @@ dev.off()
 
 # Fig 1b
 ```{r}
+# Biologist note:
+# Figure 1B: focus on GTEx samples and color by brain tissue region.
+# This reveals whether normal anatomical regions cluster separately.
 new_mat = umap_data1[ which(umap_data1$disease=="GTEX"), ]
 
 # UMAP for GTEX petals 
@@ -118,6 +126,9 @@ dev.off()
 # Supp Fig 1a
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 1A compares embeddings with and without batch correction
+# using UMAP, PCA, and tSNE side-by-side.
 ans_df = read.delim("tables/umapdata_with_CBTN_8_27_2021.txt", header=T, stringsAsFactors = FALSE)
 all_vals = c("yellowgreen","purple" ,"orange" ,"deeppink", "dodgerblue")
 names(all_vals) =  c("GTEX","TCGA-GBM", "TCGA-LGG","CGGA", "CBTN")
@@ -180,6 +191,9 @@ dev.off()
 # Supp Fig 1b 
 
 ```{r}
+# Biologist note:
+# Supplemental Figure 1B overlays GTEx sample-level covariates
+# (PMI, age, RNA quality, sex, Hardy score, preparation) on UMAP.
 # supp figure for only GTEx
 new_mat = umap_data1[ which(umap_data1$disease=="GTEX"), ]
 info2 = read.csv("~/HollandLabShared/Sonali/MultiDisease_Paper/recount_brain/recount_brain_v2.csv", 

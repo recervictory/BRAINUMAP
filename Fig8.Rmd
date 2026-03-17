@@ -9,6 +9,9 @@ output:
 ---
 
 ```{r }
+# Biologist note:
+# This script creates a gene-by-gene multi-omics resource.
+# For each selected gene, it draws four UMAP overlays: expression, mutation, copy number, and fusion.
 rm(list=ls())
 
 library(grid)

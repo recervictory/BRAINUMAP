@@ -15,6 +15,9 @@ sources - recount2 and CBTN and process them to save as log2 normalized counts.
 
 
 ```{r}
+# Biologist note:
+# This block downloads recount-brain study objects and metadata,
+# which provide public RNA-seq sources used later for adult-brain references.
 
 rm(list=ls())
 library(recount)
@@ -53,6 +56,9 @@ if(!file.exists(file.path('TCGA', 'rse_gene_brain.Rdata'))) {
 # Creating log2 TPM counts. 
 
 ```{r}
+# Biologist note:
+# This block converts TCGA gene counts into log2(TPM+1),
+# then keeps protein-coding genes for compatibility with downstream comparisons.
 
 rm(list=ls())
 library(rtracklayer)
@@ -87,6 +93,9 @@ save(rse_gene, file = file.path(resdir, paste0( "TCGA_rse_gene.RData")) )
 # Combining data from recount2
 
 ```{r}
+# Biologist note:
+# This block combines TCGA, GTEx, and CGGA into one harmonized expression matrix,
+# then appends glioma-related annotations (IDH, 1p/19q, grade, subtype labels).
 rm(list=ls())
 library(SummarizedExperiment)
 library(rtracklayer)
@@ -244,6 +253,9 @@ save(big_rse, file =file.path(resdir, "data", "log2_tpm_big_rse_1_28_2021.Rdata"
 # Pediatric Data from CBTN 
 
 ```{r}
+# Biologist note:
+# This block processes CBTN counts and converts them to log2(TPM+1),
+# restricted to the same shared genes as the adult reference matrix.
 
 rm(list=ls())
 
