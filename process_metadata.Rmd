@@ -2,7 +2,7 @@
 title: "Process and Harmonize Metadata"
 author: "Victor Banerjee"
 date: "March 18, 2026"
-version: "0.20"
+version: "0.30"
 output:
 	html_document:
 		toc: true
@@ -214,11 +214,12 @@ cbtn_df
 ```
 
 ```{r}
-cbtn_df %>% mutate(
+cbtn_col_meta = cbtn_df %>% mutate(
   # --- Identity ---
   sample_id          = Kids_First_Biospecimen_ID,
   dataset            = "CBTN",                          # "CBTN"
   source_study       = cohort,
+  donor_id           = Kids_First_Participant_ID,
 
   # --- Demographics ---
   sex                = reported_gender,
@@ -261,23 +262,44 @@ cbtn_df %>% mutate(
   cancer_predisposition = cancer_predispositions,
   tumor_descriptor   = tumor_descriptor
   
-) %>% select(
-  sample_id, dataset, source_study,
-  donor_id,                                             # add cohort_participant_id as donor_id before this select
-  sex, age_range,
-  tissue, brain_region, histology, who_grade, tumor_type,
-  idh_status, codel_1p19q, molecular_subtype, mgmt_status, tert_status,
-  os_days, os_status, vital_status,
-  pfs_days, pfs_status, dfs_days, dfs_status, days_to_last_followup,
-  sample_type, treatment,
-  rna_integrity_number, postmortem_interval_min, autolysis_score, death_classification,
-  tissue_site_broad, tissue_site_detail,
-  biospecimen_id, participant_id, cancer_predisposition, tumor_descriptor,
-  sra_run, sra_sample, sra_experiment
-)
+) %>% dplyr::select(dplyr::any_of(c(
+  "sample_id", "dataset", "source_study",
+  "donor_id",
+  "sex", "age_range",
+  "tissue", "brain_region", "histology", "who_grade", "tumor_type",
+  "idh_status", "codel_1p19q", "molecular_subtype", "mgmt_status", "tert_status",
+  "os_days", "os_status", "vital_status",
+  "pfs_days", "pfs_status", "dfs_days", "dfs_status", "days_to_last_followup",
+  "sample_type", "treatment",
+  "rna_integrity_number", "postmortem_interval_min", "autolysis_score", "death_classification",
+  "tissue_site_broad", "tissue_site_detail",
+  "biospecimen_id", "participant_id", "cancer_predisposition", "tumor_descriptor",
+  "sra_run", "sra_sample", "sra_experiment"
+)))
 
 ```
 
+# Add Metadata for CBTN RSE object
+```{r}
+rownames(cbtn_col_meta) = colnames(cbtn_rse)
+colData(cbtn_rse) = DataFrame(cbtn_col_meta)        
+log_step(paste0("CBTN colData harmonized: ", nrow(cbtn_col_meta), " samples x ",
+                ncol(cbtn_col_meta), " columns"))
+log_step(paste0("Brain regions: ",
+                paste(sort(unique(cbtn_col_meta$brain_region)), collapse = " | ")))     
+log_step(paste0("OS status coverage:  ",
+                sum(!is.na(cbtn_col_meta$os_status)), " / ", nrow(cbtn_col_meta)))
+log_step(paste0("PFS status coverage: ",
+                sum(!is.na(cbtn_col_meta$pfs_status)), " / ", nrow(cbtn_col_meta)))
+
+```
+
+# Save CBTN RSE with new metadata
+```{r}
+cbtn_out_path = file.path(out_dir, "CBTN.Final.SEObject.rds")
+saveRDS(cbtn_rse, cbtn_out_path)    
+log_step(paste0("Saved CBTN RSE with metadata: ", cbtn_out_path))
+```
 
 
 ## Check colData before harmonization
