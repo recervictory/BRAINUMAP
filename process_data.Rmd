@@ -25,6 +25,7 @@ sources - recount2 and CBTN and process them to save as log2 normalized counts.
 
 ```{r}
 library(recount)
+library(dplyr)
 library(futile.logger)
 ```
 
@@ -784,3 +785,94 @@ saveRDS(log2_tpm_cbtn, file.path(final_output_dir, "log2_tpm_cbtn.rds") )
 log_step("END: Saved CBTN log2(TPM+1) matrix to output/final_processed/log2_tpm_cbtn.rds")
 
 ```
+
+# Create SummarizedExperiment from CBTN data
+
+```{r}
+# Biologist note:
+# This block creates a SummarizedExperiment object for the CBTN data,
+# using the same shared genes and including the gtf annotation as rowRanges.        
+library(SummarizedExperiment)
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+final_output_dir = file.path(project_dir, "output", "final_processed")  
+log_step("START: Creating SummarizedExperiment for CBTN data")
+log2_tpm_cbtn = readRDS(file.path(final_output_dir, "log2_tpm_cbtn.rds"))
+```
+
+```{r}  
+
+
+log_step("GTF subset to CBTN genes, matched order: TRUE")
+cbtn_rse = SummarizedExperiment(assays=SimpleList(log2_tpm_cbtn))
+cbtn_rse
+```
+
+
+```{r}
+project_dir      = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_openpbta_dir = file.path(project_data_dir, "raw", "openpbta", "release-v23-20230115")
+resdir           = file.path(project_data_dir, "processed", "log2_tpm_rse")
+annotations_dir  = file.path(project_data_dir, "raw", "recount_brain", "annotations")
+gtf_path         = file.path(annotations_dir, "gencode.v25.annotation.gtf.gz")
+
+
+# --- Load pbta-histologies.tsv ---
+log_step("Loading pbta-histologies.tsv")
+histologies_path = file.path(raw_openpbta_dir, "pbta-histologies.tsv")
+if (!file.exists(histologies_path)) {
+  stop("Missing: pbta-histologies.tsv — check path: ", histologies_path)
+}
+
+histologies = read.csv(
+  histologies_path, header = TRUE, sep = "\t",
+  quote = "", stringsAsFactors = FALSE, check.names = FALSE
+)
+histologies 
+
+```
+
+
+
+```{r}
+library(dplyr)
+
+# --- Filter histologies to RNA-Seq and join to cbtn_rse column order ---
+sample_ids = colnames(cbtn_rse)
+
+col_meta = histologies %>%
+  filter(experimental_strategy == "RNA-Seq") %>%
+  filter(Kids_First_Biospecimen_ID %in% sample_ids) %>%
+  slice(match(sample_ids, Kids_First_Biospecimen_ID)) %>%
+  as.data.frame()
+
+rownames(col_meta) = col_meta$Kids_First_Biospecimen_ID
+
+col_meta
+```
+
+```{r}
+log_step(paste0("Histologies filtered to RNA-Seq: ", nrow(col_meta), " / ", length(sample_ids), " samples matched"))
+
+# --- Attach to RSE ---
+colData(cbtn_rse) = DataFrame(col_meta)
+
+log_step(paste0("colData attached: ", ncol(col_meta), " metadata columns"))
+log_step(paste0("CBTN RSE final: ", nrow(cbtn_rse), " genes x ", ncol(cbtn_rse), " samples"))
+cbtn_rse
+```
+
+```{r}
+cbtn_rse
+```
+
+
+
+
+
+
+```{r}
+saveRDS(cbtn_rse, file.path(final_output_dir, "cbtn_pedrictic.rds"))
+log_step("END: Saved CBTN SummarizedExperiment to output/final_processed/cbtn_pedrictic.rds")
+```
+
