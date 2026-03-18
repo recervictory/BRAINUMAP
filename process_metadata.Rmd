@@ -1,0 +1,217 @@
+---
+title: "Process and Harmonize Metadata"
+author: "Victor Banerjee"
+date: "March 18, 2026"
+version: "0.10"
+output:
+	html_document:
+		toc: true
+		theme: united
+---
+
+## Purpose
+
+This notebook does three things for the three core processed objects:
+1. Load TCGA, GTEX, and other_brain SummarizedExperiment objects.
+2. Check `colData` for missing values and schema differences.
+3. Create a shared `colData` structure (same columns, same order) and save harmonized outputs.
+
+```{r setup}
+rm(list = ls())
+
+library(SummarizedExperiment)
+library(S4Vectors)
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+data_dir = file.path(project_dir, "data", "processed", "log2_tpm_rse")
+out_dir = file.path(project_dir, "output", "metadata_checks")
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+tcga_path  = file.path(data_dir, "TCGA_rse_gene.RData")
+gtex_path  = file.path(data_dir, "GTEX_rse_gene.RData")
+other_path = file.path(data_dir, "other_brain_rse_gene_6_3_2020.RData")
+
+needed = c(tcga_path, gtex_path, other_path)
+missing_needed = needed[!file.exists(needed)]
+if (length(missing_needed) > 0) {
+	stop(
+		paste0(
+			"Missing required files:\n- ",
+			paste(missing_needed, collapse = "\n- ")
+		)
+	)
+}
+```
+
+## Load objects
+
+```{r load_objects}
+tcga_rse  = get(load(tcga_path))
+gtex_rse  = get(load(gtex_path))
+other_rse = get(load(other_path))
+
+obj_list = list(
+	TCGA = tcga_rse,
+	GTEX = gtex_rse,
+	OTHER = other_rse
+)
+
+print(sapply(obj_list, ncol))
+```
+
+## Check colData before harmonization
+
+```{r check_coldata_before}
+colnames_list = lapply(obj_list, function(x) colnames(as.data.frame(colData(x))))
+
+all_cols_union = unique(unlist(colnames_list))
+cat("Total unique metadata columns across all 3 objects:", length(all_cols_union), "\n")
+
+schema_summary = data.frame(
+	column = all_cols_union,
+	in_TCGA = all_cols_union %in% colnames_list$TCGA,
+	in_GTEX = all_cols_union %in% colnames_list$GTEX,
+	in_OTHER = all_cols_union %in% colnames_list$OTHER,
+	stringsAsFactors = FALSE
+)
+
+write.table(
+	schema_summary,
+	file = file.path(out_dir, "coldata_schema_presence_before.tsv"),
+	sep = "\t",
+	quote = FALSE,
+	row.names = FALSE
+)
+
+na_summary_before = do.call(
+	rbind,
+	lapply(names(obj_list), function(nm) {
+		cd = as.data.frame(colData(obj_list[[nm]]), stringsAsFactors = FALSE)
+		data.frame(
+			object = nm,
+			column = names(cd),
+			n_na = sapply(cd, function(v) sum(is.na(v))),
+			pct_na = round(100 * sapply(cd, function(v) mean(is.na(v))), 2),
+			stringsAsFactors = FALSE
+		)
+	})
+)
+
+write.table(
+	na_summary_before,
+	file = file.path(out_dir, "coldata_na_summary_before.tsv"),
+	sep = "\t",
+	quote = FALSE,
+	row.names = FALSE
+)
+
+head(na_summary_before)
+```
+
+## Harmonize colData to a shared schema
+
+```{r harmonize_coldata}
+# Put biologically important columns first (if present), then all others.
+priority_cols = c(
+	"run_s", "Dataset", "Dataset2", "disease", "disease_status", "sample_name_s",
+	"sra_sample_s", "sra_study_s", "tissue", "sex", "age", "development",
+	"tissue_site_1", "clinical_stage_1", "clinical_stage_2", "bioproject_s"
+)
+
+shared_cols = unique(c(priority_cols, all_cols_union))
+
+harmonize_one_coldata = function(rse_obj, shared_cols, object_name) {
+	cd = as.data.frame(colData(rse_obj), stringsAsFactors = FALSE)
+
+	# Add missing columns as NA_character_ so all objects have identical metadata structure.
+	missing_cols = setdiff(shared_cols, colnames(cd))
+	if (length(missing_cols) > 0) {
+		for (m in missing_cols) {
+			cd[[m]] = NA_character_
+		}
+	}
+
+	# Keep same column order everywhere.
+	cd = cd[, shared_cols, drop = FALSE]
+
+	# Ensure run_s exists and is aligned to sample columns.
+	if (!("run_s" %in% colnames(cd))) {
+		cd$run_s = colnames(rse_obj)
+	}
+	bad_run = is.na(cd$run_s) | cd$run_s == ""
+	if (any(bad_run)) {
+		cd$run_s[bad_run] = colnames(rse_obj)[bad_run]
+	}
+
+	# rownames in colData must match object columns.
+	rownames(cd) = colnames(rse_obj)
+
+	colData(rse_obj) = S4Vectors::DataFrame(cd)
+
+	cat(object_name, "-> colData columns:", ncol(cd), "| rows:", nrow(cd), "\n")
+	return(rse_obj)
+}
+
+tcga_rse_h  = harmonize_one_coldata(tcga_rse,  shared_cols, "TCGA")
+gtex_rse_h  = harmonize_one_coldata(gtex_rse,  shared_cols, "GTEX")
+other_rse_h = harmonize_one_coldata(other_rse, shared_cols, "OTHER")
+```
+
+## Validate and save harmonized objects
+
+```{r validate_and_save}
+stopifnot(identical(colnames(colData(tcga_rse_h)), colnames(colData(gtex_rse_h))))
+stopifnot(identical(colnames(colData(tcga_rse_h)), colnames(colData(other_rse_h))))
+
+na_summary_after = do.call(
+	rbind,
+	lapply(
+		list(TCGA = tcga_rse_h, GTEX = gtex_rse_h, OTHER = other_rse_h),
+		function(x) {
+			cd = as.data.frame(colData(x), stringsAsFactors = FALSE)
+			data.frame(
+				object = unique(ifelse(grepl("TCGA", colnames(cd)[1]), "TCGA", NA)),
+				column = names(cd),
+				n_na = sapply(cd, function(v) sum(is.na(v))),
+				pct_na = round(100 * sapply(cd, function(v) mean(is.na(v))), 2),
+				stringsAsFactors = FALSE
+			)
+		}
+	)
+)
+
+# Fix object labels for after-summary
+na_summary_after$object = rep(c("TCGA", "GTEX", "OTHER"), each = ncol(colData(tcga_rse_h)))
+
+write.table(
+	na_summary_after,
+	file = file.path(out_dir, "coldata_na_summary_after.tsv"),
+	sep = "\t",
+	quote = FALSE,
+	row.names = FALSE
+)
+
+# Save new harmonized versions (original files are preserved).
+save(tcga_rse_h,  file = file.path(data_dir, "TCGA_rse_gene_coldata_harmonized.RData"))
+save(gtex_rse_h,  file = file.path(data_dir, "GTEX_rse_gene_coldata_harmonized.RData"))
+save(other_rse_h, file = file.path(data_dir, "other_brain_rse_gene_6_3_2020_coldata_harmonized.RData"))
+
+# Optional combined metadata table for quick inspection.
+combined_coldata = rbind(
+	as.data.frame(colData(tcga_rse_h), stringsAsFactors = FALSE),
+	as.data.frame(colData(gtex_rse_h), stringsAsFactors = FALSE),
+	as.data.frame(colData(other_rse_h), stringsAsFactors = FALSE)
+)
+
+write.table(
+	combined_coldata,
+	file = file.path(out_dir, "combined_coldata_harmonized.tsv"),
+	sep = "\t",
+	quote = FALSE,
+	row.names = FALSE
+)
+
+cat("Harmonization complete.\n")
+cat("Saved harmonized objects and metadata checks under:\n", out_dir, "\n")
+```
+
