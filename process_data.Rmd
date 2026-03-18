@@ -509,16 +509,17 @@ table(finaldf$tissue_site_1, useNA="always")
 
 
 ```
+
 ```{r}
 library(readxl)
 
-cgga_annot_path = "K:/PHO/AG Kerl/Victor/01_PBTA/00_Github/BRAINUMAP/data/raw/annotations/PMC4754110_s1_gbm_lgg_codel_status.xlsx"
+tgga_annot_path = "K:/PHO/AG Kerl/Victor/01_PBTA/00_Github/BRAINUMAP/data/raw/annotations/PMC4754110_s1_gbm_lgg_codel_status.xlsx"
 
 # Check sheet names first
-readxl::excel_sheets(cgga_annot_path)
+readxl::excel_sheets(tgga_annot_path)
 
 # Read first sheet (adjust sheet= if needed)
-tcga_codel = readxl::read_excel(cgga_annot_path, sheet = 1)
+tcga_codel = readxl::read_excel(tgga_annot_path, sheet = 1)
 
 
 ```
@@ -550,7 +551,8 @@ finaldf$TCGA_Glioma_Grade[which(finaldf$disease=="TCGA-LGG" &
 
 ```
 
-# CCGA
+# CCGA Data Processing
+
 ```{r}
 
 library(futile.logger)
@@ -582,18 +584,8 @@ files = list(
 
 ```
 
-```{r}
-clin_list = lapply(files, function(f) {
 
-  txt = list.files(raw_cgga_dir, pattern = f$pattern, full.names = TRUE, recursive = TRUE)
-  txt = txt[grepl("\\.txt$", txt)][1]
-  log_step(paste0("Reading: ", txt))
-  df = read.table(txt, header = TRUE, sep = "\t", quote = "", 
-                  stringsAsFactors = FALSE, check.names = FALSE)
-  df$batch = f$batch
-  df
-})
-```
+## Add Samples Metadata to Object 
 
 
 ```{r}
@@ -625,6 +617,7 @@ write.table(cgga_combined, file = out_path, sep = "\t",
 log_step(paste0("Saved: ", out_path))
 ```
 
+# Clean the Meatdata fromm CGGA
 
 ```{r}
 # CGGA : 
