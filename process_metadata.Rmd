@@ -2,7 +2,7 @@
 title: "Process and Harmonize Metadata"
 author: "Victor Banerjee"
 date: "March 18, 2026"
-version: "0.10"
+version: "0.20"
 output:
 	html_document:
 		toc: true
@@ -17,7 +17,7 @@ This notebook does three things for the three core processed objects:
 3. Create a shared `colData` structure (same columns, same order) and save harmonized outputs.
 
 ```{r setup}
-rm(list = ls())
+
 
 library(SummarizedExperiment)
 library(S4Vectors)
@@ -59,7 +59,229 @@ obj_list = list(
 print(sapply(obj_list, ncol))
 ```
 
+
+
+# GTEX data
+### https://www.science.org/doi/10.1126/science.aaz1776
+
+
+
+```{r}
+
+
+# File 2: Subject Phenotypes (sex, age range, Hardy scale — one row per donor)
+subject_phe_url  = "https://storage.googleapis.com/adult-gtex/annotations/v8/metadata-files/GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt"
+subject_phe_path = file.path(gtex_anno_dir, "GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt")
+
+if (!file.exists(subject_phe_path)) {
+  log_step("Downloading GTEx v8 SubjectPhenotypesDS")
+  download.file(subject_phe_url, destfile = subject_phe_path, mode = "wb")
+}
+
+gtex_subjects = read.delim(subject_phe_path, stringsAsFactors = FALSE, check.names = FALSE)
+
+gtex_subjects = gtex_subjects %>%
+  mutate(
+    SEX = case_when(
+      SEX == 1 ~ "Male",
+      SEX == 2 ~ "Female",
+      TRUE     ~ NA_character_
+    ),
+    DTHHRDY = case_when(
+      DTHHRDY == 0 ~ "Ventilator",
+      DTHHRDY == 1 ~ "Violent/fast",
+      DTHHRDY == 2 ~ "Fast natural",
+      DTHHRDY == 3 ~ "Intermediate",
+      DTHHRDY == 4 ~ "Slow death",
+      TRUE         ~ NA_character_
+    ),
+    # AGE is already a range string e.g. "60-69" — just rename for clarity
+    age_range = AGE
+  ) %>%
+  rename(
+    donor_id       = SUBJID,
+    sex            = SEX,
+    death_classification = DTHHRDY
+  ) %>%
+  select(donor_id, sex, age_range, death_classification)
+
+gtex_subjects
+```
+
+
+
+
+
+```{r}
+library(dplyr)
+
+brain_df = colData(gtex_rse) %>%
+  as.data.frame() %>%
+  mutate(.idx = row_number()) %>%
+  filter(smts == "Brain") %>%
+  mutate(donor_id = sub("^(GTEX-[^-]+)-.*", "\\1", sampid)) %>%
+  left_join(
+    gtex_subjects %>% select(donor_id, sex, age_range, death_classification),
+    by = "donor_id"
+  )
+
+brain_df %>% select(sample, smts , sample,donor_id,sex, sampid,age_range,death_classification, bigwig_file,  smtsd, project, smtstptref)
+```
+```{r}
+col_meta_gtex = brain_df %>%
+  mutate(
+    # --- Identity ---
+    sample_id               = sampid,
+    dataset                 = "GTEx",
+    source_study            = project,
+
+    # --- Demographics ---
+    # sex, age_range, death_classification joined from gtex_subjects
+
+    # --- Tissue ---
+    tissue                  = "Normal Brain",
+    tumor_type              = "Normal Brain",
+    tissue_site_broad       = smts,
+    tissue_site_detail      = smtsd,
+    brain_region            = smtsd,
+
+    # --- Sample quality ---
+    rna_integrity_number    = as.character(smrin),
+    postmortem_interval_min = as.character(smtspax),
+    autolysis_score         = as.character(smatsscr),
+
+    # --- SRA traceability ---
+    sra_run                 = run,
+    sra_sample              = sample,
+    sra_experiment          = experiment,
+
+    sample_type             = "Normal"
+  ) %>%
+  select(
+    sample_id, dataset, source_study,
+    donor_id, sex, age_range, death_classification,
+    tissue, tumor_type,
+    tissue_site_broad, tissue_site_detail, brain_region,
+    rna_integrity_number, postmortem_interval_min, autolysis_score,
+    sra_run, sra_sample, sra_experiment,
+    sample_type
+  )
+
+# Attach to RSE
+rownames(col_meta_gtex) = colnames(brain_gtex_rse)
+colData(brain_gtex_rse) = DataFrame(col_meta_gtex)
+
+log_step(paste0("GTEx colData harmonized: ", nrow(col_meta_gtex), " samples x ",
+                ncol(col_meta_gtex), " columns"))
+log_step(paste0("  Brain regions: ",
+                paste(sort(unique(col_meta_gtex$tissue_site_detail)), collapse = " | ")))
+log_step(paste0("  Sex coverage:  ",
+                sum(!is.na(col_meta_gtex$sex)), " / ", nrow(col_meta_gtex)))
+log_step(paste0("  Age coverage:  ",
+                sum(!is.na(col_meta_gtex$age_range)), " / ", nrow(col_meta_gtex)))
+log_step(paste0("  Hardy scale:   ",
+                sum(!is.na(col_meta_gtex$death_classification)), " / ", nrow(col_meta_gtex)))
+```
+
+```{r}
+as.data.frame(colData(brain_gtex_rse) )
+```
+
+
+```{r}
+brain_gtex_rse <-  colData(gtex_rse) %>%
+  as.data.frame() %>%
+  filter(smts == "Brain") 
+
+brain_gtex_rse
+```
+
+```{r}
+saveRDS(brain_gtex_rse, file.path(out_dir, "GTExBrain.Final.SEObject.rds")) 
+```
+
+# CBTN
+```{r}
+final_output_dir = file.path(project_dir, "output", "final_processed")  
+
+cbtn_rse <- readRDS(file.path(final_output_dir, "cbtn_pedrictic.rds"))
+```
+
+
+```{r}
+cbtn_df <- as.data.frame(colData(cbtn_rse))
+cbtn_df
+```
+
+```{r}
+cbtn_df %>% mutate(
+  # --- Identity ---
+  sample_id          = Kids_First_Biospecimen_ID,
+  dataset            = "CBTN",                          # "CBTN"
+  source_study       = cohort,
+
+  # --- Demographics ---
+  sex                = reported_gender,
+  age_range          = age_at_diagnosis_days,           # days; rename for clarity
+
+  # --- Tissue ---
+  tissue             = "Tumor Brain",
+  brain_region       = CNS_region,
+  histology          = broad_histology,
+  who_grade          = NA_character_,                   # not directly available; derive from pathology_diagnosis if needed
+  tumor_type         = cancer_group,
+
+  # --- Molecular subtype ---
+  idh_status         = NA_character_,                   # not in CBTN metadata; add if merged from molecular data
+  codel_1p19q        = NA_character_,
+  molecular_subtype  = molecular_subtype,
+  mgmt_status        = NA_character_,
+  tert_status        = NA_character_,
+
+  # --- Survival ---
+  os_days            = as.character(OS_days),
+  os_status          = OS_status,
+  vital_status       = OS_status,                       # CBTN uses OS_status as proxy
+  pfs_days           = as.character(PFS_days),
+  pfs_status         = NA_character_,                   # not explicitly in CBTN metadata
+  dfs_days           = NA_character_,
+  dfs_status         = NA_character_,
+  days_to_last_followup = as.character(age_last_update_days),
+  sample_type        = sample_type,
+  treatment          = extent_of_tumor_resection,       # closest surgical/treatment proxy
+
+
+  # --- Tissue site ---
+  tissue_site_broad  = primary_site,
+  tissue_site_detail = primary_site,
+
+  # --- CBTN-specific ---
+  biospecimen_id     = sample_id,
+  participant_id     = Kids_First_Participant_ID,
+  cancer_predisposition = cancer_predispositions,
+  tumor_descriptor   = tumor_descriptor
+  
+) %>% select(
+  sample_id, dataset, source_study,
+  donor_id,                                             # add cohort_participant_id as donor_id before this select
+  sex, age_range,
+  tissue, brain_region, histology, who_grade, tumor_type,
+  idh_status, codel_1p19q, molecular_subtype, mgmt_status, tert_status,
+  os_days, os_status, vital_status,
+  pfs_days, pfs_status, dfs_days, dfs_status, days_to_last_followup,
+  sample_type, treatment,
+  rna_integrity_number, postmortem_interval_min, autolysis_score, death_classification,
+  tissue_site_broad, tissue_site_detail,
+  biospecimen_id, participant_id, cancer_predisposition, tumor_descriptor,
+  sra_run, sra_sample, sra_experiment
+)
+
+```
+
+
+
 ## Check colData before harmonization
+
 
 ```{r check_coldata_before}
 colnames_list = lapply(obj_list, function(x) colnames(as.data.frame(colData(x))))
