@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 5 connects expression neighborhoods to pathway-level biology.
+
+Biological idea:
+- Instead of single genes, summarize coordinated pathway activity (GSVA) to reveal functional programs.
+
+Conceptual flow:
+1. Load batch-corrected expression and aligned metadata.
+2. Compute pathway enrichment scores per sample.
+3. Compare pathway patterns across disease groups and UMAP regions.
+
+Interpretation focus:
+- Pathway shifts can clarify mechanisms not obvious from individual marker genes.
+- Consistent pathway trends across related clusters strengthen biological interpretation.
+
 
 ```{r}
 # Biologist note:

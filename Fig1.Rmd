@@ -8,6 +8,21 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 1 introduces the global transcriptional map and key cohort labels.
+
+Biological idea:
+- Build intuition for how normal brain tissue, adult gliomas, and pediatric tumors occupy the shared expression landscape.
+
+What this notebook emphasizes:
+1. Consistent visual encoding (color, size, labeling) across panels.
+2. Metadata-driven overlays to show diagnosis and tissue context.
+3. High-level structure before focusing on subtype-specific analyses in later figures.
+
+Interpretation focus:
+- Broad clustering patterns indicate major biological programs and disease-state differences.
+
 
 ```{r setup}
 # Biologist note:

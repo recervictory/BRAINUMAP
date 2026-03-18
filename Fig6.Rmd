@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 6 visualizes marker-gene expression directly on the BRAINUMAP map.
+
+Biological idea:
+- Use selected genes as biological probes to annotate regions with lineage, state, or tumor-associated signals.
+
+Conceptual flow:
+1. Keep one shared coordinate system.
+2. Overlay one gene at a time using continuous color scales.
+3. Compare expression hotspots across disease-defined regions.
+
+Interpretation focus:
+- Localized high-expression zones can indicate cell-state identity or pathway activation niches.
+- Diffuse expression suggests broader, non-specific programs.
+
 ```{r setup}
 # Biologist note:
 # This setup block loads UMAP metadata and expression matrix,

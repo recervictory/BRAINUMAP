@@ -8,6 +8,27 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+This notebook constructs the data foundation for all downstream BRAINUMAP analyses.
+
+Core concepts used in this workflow:
+1. Integrate multiple public RNA-seq cohorts into one comparable framework.
+2. Convert raw/count-like values to log2(TPM+1) so expression scales are more comparable across samples.
+3. Keep a consistent protein-coding gene reference so merged matrices align gene-for-gene.
+4. Build biologically meaningful metadata labels (tumor class, grade, IDH/1p19q context) for interpretation.
+5. Save intermediate and final artifacts in stable folders for reproducible downstream figure generation.
+
+Why these steps matter biologically:
+- TPM normalization reduces sequencing-depth differences.
+- Log transformation dampens extreme values and improves visual/statistical stability.
+- Shared gene space is required before combining cohorts, running UMAP, or applying batch correction.
+
+Main output expectation:
+- Processed matrices in data/processed/log2_tpm_rse.
+- Final adult integrated reference files in output/final_processed.
+- Pediatric CBTN matrix matched to the same gene universe.
+
 ```{r logger_package_note}
 # install.packages("futile.logger")
 ```
@@ -267,7 +288,7 @@ log_step("END: Saved processed GTEX matrix to data/processed/log2_tpm_rse/GTEX_r
 ```
 
 
-## 
+## Downloading CBTN data
 ```{r}
 library(futile.logger)
 
@@ -383,7 +404,8 @@ log_step("Saved other_brain_rse_gene_6_3_2020.RData")
 
 
 # Combining data from recount2
-
+- This block combines TCGA, GTEx, and CGGA into one harmonized expression matrix, then appends glioma-related annotations (IDH, 1p/19q, grade, subtype labels).
+- The resulting combined matrix will be used for downstream analyses and visualizations, such as UMAP projections colored by gene expression or mutation status.
 ```{r}
 # Biologist note:
 # This block combines TCGA, GTEx, and CGGA into one harmonized expression matrix,
@@ -504,17 +526,18 @@ table(finaldf$disease, useNA="always")
 table(finaldf$development, useNA="always")
 table(finaldf$tissue_site_1, useNA="always")
 
-
-
-
-
-
 ```
+
+
+# Fixing metadata for Gliomas
+- This block adds glioma-specific annotations (IDH status, 1p/19q   codeletion, grade) to the TCGA samples in the combined matrix, based on external annotation files. This allows us to label glioma samples with clinically relevant subtypes for downstream analysis and visualization.
 
 ```{r}
 library(readxl)
 
-tgga_annot_path = "K:/PHO/AG Kerl/Victor/01_PBTA/00_Github/BRAINUMAP/data/raw/annotations/PMC4754110_s1_gbm_lgg_codel_status.xlsx"
+# tgga_annot_path = "K:/PHO/AG Kerl/Victor/01_PBTA/00_Github/BRAINUMAP/data/raw/annotations/PMC4754110_s1_gbm_lgg_codel_status.xlsx"
+tgga_annot_path = file.path(project_data_dir, "raw", "annotations", "PMC4754110_s1_gbm_lgg_codel_status.xlsx")
+
 
 # Check sheet names first
 readxl::excel_sheets(tgga_annot_path)
@@ -527,9 +550,6 @@ tcga_codel = readxl::read_excel(tgga_annot_path, sheet = 1)
 
 
 ```{r}
-# fix - metadata  for Gliomas
-# add IDH status for TCGA : 
-
 tcga_codel = tcga_codel[,c("Case","Study", "IDH status", "1p/19q codeletion")]
 colnames(tcga_codel) = c("TCGA_case", "Study", "TCGA_idh", "TCGA_1p_19q_codel")
 tcga_codel[,3] = gsub("WT", "Wildtype", tcga_codel[,3])
@@ -552,7 +572,9 @@ finaldf$TCGA_Glioma_Grade[which(finaldf$disease=="TCGA-LGG" &
 
 ```
 
-# CCGA Data Processing
+# CGGA Data Processing
+-   This block processes the CGGA clinical annotation files, merges them into a single metadata table, and then adds relevant glioma annotations (IDH status, 1p/19q codeletion, grade) to the combined matrix. This ensures that CGGA samples are labeled with the same clinically relevant subtypes as TCGA for downstream analysis.
+
 
 ```{r}
 
@@ -618,7 +640,7 @@ write.table(cgga_combined, file = out_path, sep = "\t",
 log_step(paste0("Saved: ", out_path))
 ```
 
-# Clean the Meatdata fromm CGGA
+# Clean the Metadata from CGGA
 
 ```{r}
 # CGGA : 
@@ -669,6 +691,7 @@ log_step("END: Saved final harmonized metadata and SummarizedExperiment to outpu
 
 
 # Pediatric Data from CBTN 
+- This block processes CBTN counts and converts them to log2(TPM+1), restricted to the same shared genes as the adult reference matrix. This allows us to integrate pediatric samples into the same analysis framework as TCGA and GTEx for direct comparison.
 
 ```{r}
 # Biologist note:
@@ -787,7 +810,7 @@ log_step("END: Saved CBTN log2(TPM+1) matrix to output/final_processed/log2_tpm_
 ```
 
 # Create SummarizedExperiment from CBTN data
-
+- This block creates a SummarizedExperiment object for the CBTN data, using the same shared genes and including the gtf annotation as rowRanges. This allows us to integrate CBTN samples into the same analysis framework as TCGA and GTEx for direct comparison.
 ```{r}
 # Biologist note:
 # This block creates a SummarizedExperiment object for the CBTN data,
@@ -832,7 +855,7 @@ histologies
 
 ```
 
-
+# --- Filter histologies to RNA-Seq and join to cbtn_rse column order ---
 
 ```{r}
 library(dplyr)
@@ -861,14 +884,6 @@ log_step(paste0("colData attached: ", ncol(col_meta), " metadata columns"))
 log_step(paste0("CBTN RSE final: ", nrow(cbtn_rse), " genes x ", ncol(cbtn_rse), " samples"))
 cbtn_rse
 ```
-
-```{r}
-cbtn_rse
-```
-
-
-
-
 
 
 ```{r}

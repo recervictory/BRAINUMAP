@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+This notebook creates the combined reference space used throughout the project.
+
+What the code is doing:
+1. Load adult reference expression and pediatric CBTN expression.
+2. Restrict both matrices to the same shared genes.
+3. Merge metadata and expression into one joint matrix.
+4. Use ComBat to reduce technical batch effects while preserving biological structure.
+5. Run dimensionality reduction (PCA, t-SNE, UMAP) to produce a disease landscape.
+
+How to interpret results:
+- Nearby points in UMAP/t-SNE are transcriptionally similar.
+- Separation can reflect tumor biology, developmental context, or technical effects.
+- Batch correction should reduce platform/study-driven separation while keeping known biological groups coherent.
+
 ```{r setup}
 # Biologist note:
 # This setup block loads the adult-brain expression matrix and the CBTN matrix,

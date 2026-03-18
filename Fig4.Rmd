@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 4 focuses on cross-disease and cross-age comparisons in the shared transcriptomic space.
+
+Biological idea:
+- Compare pediatric and adult tumor contexts to identify overlap, divergence, and potential lineage relationships.
+
+Conceptual steps:
+1. Define disease group color dictionaries.
+2. Render disease-specific overlays on common coordinates.
+3. Compare where groups co-localize or separate.
+
+Interpretation focus:
+- Co-localization can indicate shared programs.
+- Separation can indicate distinct developmental or oncogenic states.
+
 
 ```{r}
 # Biologist note:

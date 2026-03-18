@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 2 expands sample-level context on top of the BRAINUMAP embedding.
+
+Biological idea:
+- Examine how clinical and histologic annotations distribute across expression-defined neighborhoods.
+
+What this notebook is doing conceptually:
+1. Reuse the common UMAP coordinates.
+2. Overlay selected metadata variables in separate panels.
+3. Compare gradients and boundaries to infer transitions or mixed states.
+
+Interpretation focus:
+- Smooth gradients may indicate continuum biology.
+- Sharp boundaries may indicate distinct molecular classes.
+
 ```{r setup}
 # Biologist note:
 # This setup block loads the full metadata-annotated UMAP table,

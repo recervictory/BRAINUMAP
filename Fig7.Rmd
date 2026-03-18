@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 7 overlays genomic alteration burden on transcriptomic neighborhoods.
+
+Biological idea:
+- Integrate mutation, copy-number, and fusion burden with expression-state structure to identify genotype-phenotype relationships.
+
+Conceptual flow:
+1. Harmonize alteration datasets to sample IDs used in UMAP.
+2. Aggregate burden metrics or event indicators.
+3. Project genomic features on the same embedding used for expression analyses.
+
+Interpretation focus:
+- Region-specific burden enrichment may indicate subtype-defining genomic drivers.
+- Overlap or divergence from expression-defined clusters can reveal convergent vs distinct biology.
+
 
 # frequency of Mutations
 

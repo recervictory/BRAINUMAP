@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 3 links molecular positions in UMAP to clinically relevant glioma subtype labels.
+
+Biological idea:
+- Integrate IDH status and 1p/19q codeletion context to interpret where canonical glioma entities map.
+
+Conceptual flow:
+1. Standardize subtype labels across sources.
+2. Overlay subtype annotations on the shared embedding.
+3. Evaluate whether molecularly defined groups occupy expected regions.
+
+Interpretation focus:
+- Concordant clustering supports biologically meaningful embedding structure.
+- Dispersion within a subtype can suggest heterogeneity or mixed lineage programs.
+
 ```{r setup, include=FALSE}
 # Biologist note:
 # This chunk loads TCGA/CGGA integrated metadata and survival table,

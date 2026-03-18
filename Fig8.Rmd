@@ -8,6 +8,22 @@ output:
     theme: united
 ---
 
+## Conceptual Guide
+
+Figure 8 is a gene-centric multi-omics atlas view.
+
+Biological idea:
+- For each gene of interest, juxtapose expression, mutation, copy-number, and fusion patterns to form a single biological narrative.
+
+Conceptual flow:
+1. Select one gene.
+2. Render four synchronized UMAP overlays (expression, mutation, CNV, fusion).
+3. Compare spatial concordance or mismatch across modalities.
+
+Interpretation focus:
+- Concordant multi-omics hotspots suggest strong candidate driver biology.
+- Mismatched modalities can indicate post-genomic regulation or context-dependent effects.
+
 ```{r }
 # Biologist note:
 # This script creates a gene-by-gene multi-omics resource.
