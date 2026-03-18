@@ -1,17 +1,82 @@
 ---
 title: "Downloading & Processing publicly available datasets"
-author: "Sonali Arora"
-date: "Jan 3, 2023"
+author: "Victor Banerjee"
+date: "March 18, 2026"
 output:
   html_document:
     toc: true
     theme: united
 ---
 
+```{r logger_package_note}
+# install.packages("futile.logger")
+```
+
 In this vignette, we will download normalized gene expression data from two 
 sources - recount2 and CBTN and process them to save as log2 normalized counts.
 
+# Installing Library
+
+```{r}
+# BiocManager::install("recount")
+```
+
+# Loading Libraries
+
+```{r}
+library(recount)
+library(futile.logger)
+```
+
+
+# Path configuration
+- Set up project directory structure and helper functions.
+- Folders Structure:
+  - data/raw/recount_brain: raw recount2 files
+  - data/raw/openpbta: raw OpenPBTA files
+  - data/processed/log2_tpm_rse: processed log2(TPM+1) matrices
+  - data/processed/brain_umap: UMAP coordinates and metadata
+  - output/final_processed: final combined matrices and metadata for analysis
+
+```{r}
+# Biologist note:
+# All raw and processed files are kept under this repository's data folder.
+# This block creates folders if they do not already exist.
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir = file.path(project_data_dir, "raw", "recount_brain")
+raw_openpbta_dir = file.path(project_data_dir, "raw", "openpbta")
+processed_dir = file.path(project_data_dir, "processed")
+log2_tpm_dir = file.path(processed_dir, "log2_tpm_rse")
+brain_umap_dir = file.path(processed_dir, "brain_umap")
+output_dir = file.path(project_dir, "output")
+final_output_dir = file.path(output_dir, "final_processed")
+
+dir.create(project_data_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(raw_recount_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(raw_openpbta_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(log2_tpm_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(brain_umap_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(final_output_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Helper to run functions that require a working directory, without hard-coding setwd in the notebook flow.
+run_in_dir = function(path, expr) {
+  old_dir = getwd()
+  on.exit(setwd(old_dir), add = TRUE)
+  dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  setwd(path)
+  force(expr)
+}
+```
+
 # downloading data from recount2
+- Recount2 provides uniformly processed RNA-seq data from public studies, including TCGA and GTEx. 
+- Recount2's R package allows programmatic access to metadata and expression matrices, which we will use to build our combined dataset. 
+- Each study's data is stored as a SummarizedExperiment object, which we will process into log2(TPM+1) format and subset to protein-coding genes.
+
 
 
 ```{r}
@@ -21,39 +86,72 @@ sources - recount2 and CBTN and process them to save as log2 normalized counts.
 
 rm(list=ls())
 library(recount)
-setwd("~/HollandLabShared/Sonali/recount_brain")
+
+if (!requireNamespace("futile.logger", quietly = TRUE)) {
+  stop("Package 'futile.logger' is required. Please run install.packages('futile.logger').")
+}
+library(futile.logger)
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir = file.path(project_data_dir, "raw", "recount_brain")
+dir.create(raw_recount_dir, recursive = TRUE, showWarnings = FALSE)
+
+flog.appender(appender.console(), name = "BRAINUMAP")
+flog.threshold(INFO, name = "BRAINUMAP")
+log_step = function(msg) {
+  futile.logger::flog.info(msg, name = "BRAINUMAP")
+  message(msg)
+}
+log_step("START: Downloading recount metadata and study files")
+
+run_in_dir = function(path, expr) {
+  old_dir = getwd()
+  on.exit(setwd(old_dir), add = TRUE)
+  dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  setwd(path)
+  force(expr)
+}
+
 meta_v2 = recount::add_metadata(source = 'recount_brain_v2')
 meta_v1 = recount::add_metadata(source = 'recount_brain_v1')
+log_step("Metadata download complete")
 length(unique(meta_v1$sra_study_s))
 length(unique(meta_v2$sra_study_s))
 setdiff( unique(meta_v2$sra_study_s), unique(meta_v1$sra_study_s) ) # gtex study is in v2/
-save(meta_v2, file = "recount_brain_v2.Rdata")
+save(meta_v2, file = file.path(raw_recount_dir, "recount_brain_v2.Rdata"))
+log_step("Saved metadata to data/raw/recount_brain/recount_brain_v2.Rdata")
 
 
 studies = na.omit(unique(meta_v2$sra_study_s))
 lapply(studies, function(x){
     message(x)
-    if(!file.exists(file.path(x, 'rse_gene.Rdata'))) {
-        download_study(x)
+  if(!file.exists(file.path(raw_recount_dir, x, 'rse_gene.Rdata'))) {
+    log_step(paste0("Downloading gene-level recount study: ", x))
+    run_in_dir(raw_recount_dir, download_study(x))
     }
 })
 
 lapply(studies, function(x){
     message(x)
-    if(!file.exists(file.path(x, 'rse_tx.Rdata'))) {
-        download_study(x, type="rse-tx")
+  if(!file.exists(file.path(raw_recount_dir, x, 'rse_tx.Rdata'))) {
+    log_step(paste0("Downloading transcript-level recount study: ", x))
+    run_in_dir(raw_recount_dir, download_study(x, type="rse-tx"))
     }
 })
 
-if(!file.exists(file.path('TCGA', 'rse_gene_brain.Rdata'))) {
+if(!file.exists(file.path(raw_recount_dir, 'TCGA', 'rse_gene_brain.Rdata'))) {
     
-    dir.create('TCGA', showWarnings = FALSE)
+  dir.create(file.path(raw_recount_dir, 'TCGA'), recursive = TRUE, showWarnings = FALSE)
     downloader::download('http://duffel.rail.bio/recount/v2/TCGA/rse_gene_brain.Rdata', destfile = 
-                             'TCGA/rse_gene_brain.Rdata', mode = 'wb')
+               file.path(raw_recount_dir, 'TCGA', 'rse_gene_brain.Rdata'), mode = 'wb')
 }
+log_step("END: Recount download block finished")
 ```
 
 # Creating log2 TPM counts. 
+- This block converts TCGA gene counts into log2(TPM+1), then keeps protein-coding genes for compatibility with downstream comparisons.
+- We also build a GTEx log2(TPM+1) matrix in the same format, to serve as a normal brain reference in our combined dataset.
 
 ```{r}
 # Biologist note:
@@ -63,11 +161,39 @@ if(!file.exists(file.path('TCGA', 'rse_gene_brain.Rdata'))) {
 rm(list=ls())
 library(rtracklayer)
 library(recount)
-setwd("~/HollandLabShared/Sonali/recount_brain")
-resdir = "~/HollandLabShared/Sonali/recount_brain/log2_tpm_rse"
 
-rse_gene = get(load(file.path("TCGA", 'rse_gene_brain.Rdata')))
-gtf = import("annotations/gencode.v25.annotation.gtf")
+if (!requireNamespace("futile.logger", quietly = TRUE)) {
+  stop("Package 'futile.logger' is required. Please run install.packages('futile.logger').")
+}
+library(futile.logger)
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir = file.path(project_data_dir, "raw", "recount_brain")
+resdir = file.path(project_data_dir, "processed", "log2_tpm_rse")
+annotations_dir = file.path(raw_recount_dir, "annotations")
+gtf_path = file.path(annotations_dir, "gencode.v25.annotation.gtf.gz")
+dir.create(resdir, recursive = TRUE, showWarnings = FALSE)
+dir.create(annotations_dir, recursive = TRUE, showWarnings = FALSE)
+
+flog.appender(appender.console(), name = "BRAINUMAP")
+flog.threshold(INFO, name = "BRAINUMAP")
+log_step = function(msg) {
+  futile.logger::flog.info(msg, name = "BRAINUMAP")
+  message(msg)
+}
+log_step("START: Building TCGA log2(TPM+1) matrix")
+
+rse_gene = get(load(file.path(raw_recount_dir, "TCGA", 'rse_gene_brain.Rdata')))
+if (!file.exists(gtf_path)) {
+  log_step("Missing gencode.v25.annotation.gtf.gz - downloading to data/raw/recount_brain/annotations")
+  downloader::download(
+    url = "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_25/gencode.v25.annotation.gtf.gz",
+    destfile = gtf_path,
+    mode = "wb"
+  )
+}
+gtf = import(gtf_path)
 gtf = gtf[gtf$gene_type=="protein_coding", ]
 gtf = gtf[gtf$type=="gene", ]
 idx = match(gtf$gene_id, names(rowRanges(rse_gene)))
@@ -85,7 +211,172 @@ assay(rse_gene) = log2_tpm
 rse_gene = rse_gene[idx, ]
 rowRanges(rse_gene)$gencode_gene_name = gtf$gene_name
 save(rse_gene, file = file.path(resdir, paste0( "TCGA_rse_gene.RData")) )
+log_step("END: Saved processed TCGA matrix to data/processed/log2_tpm_rse/TCGA_rse_gene.RData")
 
+# Build and save GTEX in the same processed format expected downstream.
+meta_v2_path = file.path(raw_recount_dir, "recount_brain_v2.Rdata")
+if (!file.exists(meta_v2_path)) {
+  stop(
+    paste0(
+      "Missing metadata file: ", meta_v2_path, "\n",
+      "Run the recount download block first to create recount_brain_v2.Rdata."
+    )
+  )
+}
+meta_v2 = get(load(meta_v2_path))
+gtex_studies = unique(na.omit(meta_v2[meta_v2[, "Dataset"] == "GTEX", "sra_study_s"]))
+if (length(gtex_studies) == 0) {
+  stop("Could not find a GTEX study ID in recount_brain_v2 metadata.")
+}
+gtex_study = gtex_studies[1]
+gtex_source_path = file.path(raw_recount_dir, gtex_study, "rse_gene.Rdata")
+
+if (!file.exists(gtex_source_path)) {
+  log_step(paste0("Missing GTEX source file. Attempting download for study: ", gtex_study))
+  old_dir = getwd()
+  on.exit(setwd(old_dir), add = TRUE)
+  setwd(raw_recount_dir)
+  download_study(gtex_study)
+}
+
+if (!file.exists(gtex_source_path)) {
+  stop(
+    paste0(
+      "Missing GTEX source file after download attempt: ", gtex_source_path, "\n",
+      "Check network access and recount availability, then rerun."
+    )
+  )
+}
+
+log_step("START: Building GTEX log2(TPM+1) matrix")
+gtex_rse = get(load(gtex_source_path))
+rpkm_gtex <- getRPKM(scale_counts(gtex_rse))
+tpm_gtex = apply(rpkm_gtex, 2, function(x){
+  (x/sum(x))*10^6
+})
+log2_tpm_gtex = log2(tpm_gtex + 1)
+assay(gtex_rse) = log2_tpm_gtex
+
+# Keep identical protein-coding gene set/order as TCGA reference.
+gtex_rse = gtex_rse[idx, ]
+rowRanges(gtex_rse)$gencode_gene_name = gtf$gene_name
+save(gtex_rse, file = file.path(resdir, "GTEX_rse_gene.RData"))
+log_step("END: Saved processed GTEX matrix to data/processed/log2_tpm_rse/GTEX_rse_gene.RData")
+
+```
+
+
+## 
+```{r}
+library(futile.logger)
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir = file.path(project_data_dir, "raw", "recount_brain")
+resdir = file.path(project_data_dir, "processed", "log2_tpm_rse")
+```
+
+## CGGA Dataset Processing
+- The CGGA dataset (SRP027383) is processed similarly to TCGA and GTEx, but since it is not already in recount2, we start from the raw RSE object and apply the same log2(TPM+1) transformation and gene filtering.
+
+```{r}
+
+library(SummarizedExperiment)
+library(recount)
+library(rtracklayer)
+library(futile.logger)
+
+
+
+log_step = function(msg) { futile.logger::flog.info(msg); message(msg) }
+
+# Load the protein-coding gene index from already-processed TCGA object
+tcga_rse       = get(load(file.path(resdir, "TCGA_rse_gene.RData")))
+target_gene_ids = rownames(tcga_rse)
+
+# Load your SRP027383 rse_gene
+rse = get(load(file.path(raw_recount_dir, "SRP027383", "rse_gene.Rdata")))
+log_step(paste0("SRP027383 dimensions: ", nrow(rse), " genes x ", ncol(rse), " samples"))
+
+# Normalize to log2(TPM+1)
+rpkm_mat = getRPKM(scale_counts(rse))
+tpm_mat  = apply(rpkm_mat, 2, function(x) (x / sum(x)) * 1e6)
+assay(rse) = log2(tpm_mat + 1)
+
+# Subset to protein-coding genes matching TCGA/GTEX
+idx = match(target_gene_ids, rownames(rse))
+log_step(paste0("Genes matched: ", sum(!is.na(idx)), " / ", length(target_gene_ids)))
+
+other_brain_rse_gene = rse[na.omit(idx), ]
+rownames(other_brain_rse_gene) = target_gene_ids[!is.na(idx)]
+
+save(other_brain_rse_gene,
+     file = file.path(resdir, "other_brain_rse_gene_6_3_2020.RData"))
+log_step("Saved other_brain_rse_gene_6_3_2020.RData")
+```
+
+## Combining data from recount2
+- This block combines TCGA, GTEx, and CGGA into one harmonized expression matrix, then appends glioma-related annotations (IDH, 1p/19q, grade, subtype labels).
+- The resulting combined matrix will be used for downstream analyses and visualizations, such as UMAP projections colored by gene expression or mutation status.
+```{r}
+rm(list=ls())
+library(SummarizedExperiment)
+library(recount)
+library(rtracklayer)
+library(futile.logger)
+
+project_dir      = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir  = file.path(project_data_dir, "raw", "recount_brain")
+resdir           = file.path(project_data_dir, "processed", "log2_tpm_rse")
+
+log_step = function(msg) { futile.logger::flog.info(msg); message(msg) }
+
+# Load protein-coding gene index
+tcga_rse        = get(load(file.path(resdir, "TCGA_rse_gene.RData")))
+target_gene_ids = rownames(tcga_rse)
+
+# Load SRP027383
+rse = get(load(file.path(raw_recount_dir, "SRP027383", "rse_gene.Rdata")))
+log_step(paste0("SRP027383 dimensions: ", nrow(rse), " genes x ", ncol(rse), " samples"))
+
+# Normalize to log2(TPM+1)
+rpkm_mat = getRPKM(scale_counts(rse))
+tpm_mat  = apply(rpkm_mat, 2, function(x) (x / sum(x)) * 1e6)
+assay(rse) = log2(tpm_mat + 1)
+
+# --- Replace colData with meta_v2 via key join ---
+# Key: rse$sample (SRS accession per column) <-> meta_v2$sra_sample_s
+meta_v2 = get(load(file.path(raw_recount_dir, "recount_brain_v2.Rdata")))
+
+rse_samples  = as.character(rse$sample)          # one value per column
+meta_idx     = match(rse_samples, meta_v2$sra_sample_s)
+
+log_step(paste0("Samples matched to meta_v2: ", sum(!is.na(meta_idx)), " / ", length(rse_samples)))
+if (any(is.na(meta_idx))) {
+  log_step(paste0("WARN: ", sum(is.na(meta_idx)), " samples have no meta_v2 entry — colData rows will be NA"))
+}
+
+# Build new colData from meta_v2 rows, aligned to rse column order
+# Unmatched samples get an all-NA row so dimensions stay intact
+new_coldata = meta_v2[meta_idx, , drop = FALSE]
+rownames(new_coldata) = colnames(rse)            # must match rse column names
+
+# Drop original colData, attach meta_v2-derived colData
+colData(rse) = DataFrame(new_coldata)
+
+log_step(paste0("colData replaced: ", ncol(new_coldata), " metadata columns from meta_v2"))
+
+# --- Subset to protein-coding genes matching TCGA/GTEX ---
+idx = match(target_gene_ids, rownames(rse))
+log_step(paste0("Genes matched: ", sum(!is.na(idx)), " / ", length(target_gene_ids)))
+
+other_brain_rse_gene = rse[na.omit(idx), ]
+rownames(other_brain_rse_gene) = target_gene_ids[!is.na(idx)]
+
+save(other_brain_rse_gene,
+     file = file.path(resdir, "other_brain_rse_gene_6_3_2020.RData"))
+log_step("Saved other_brain_rse_gene_6_3_2020.RData")
 ```
 
 
@@ -96,16 +387,49 @@ save(rse_gene, file = file.path(resdir, paste0( "TCGA_rse_gene.RData")) )
 # Biologist note:
 # This block combines TCGA, GTEx, and CGGA into one harmonized expression matrix,
 # then appends glioma-related annotations (IDH, 1p/19q, grade, subtype labels).
-rm(list=ls())
+
 library(SummarizedExperiment)
 library(rtracklayer)
 library(recount)
 
-setwd("~/HollandLabShared/Sonali/MultiDisease_Paper/recount_brain")
-meta_v2 = get(load( "recount_brain_v2.Rdata"))
+if (!requireNamespace("futile.logger", quietly = TRUE)) {
+  stop("Package 'futile.logger' is required. Please run install.packages('futile.logger').")
+}
+library(futile.logger)
 
-data_dir = "~/HollandLabShared/Sonali/MultiDisease_Paper/recount_brain/log2_tpm_rse"
-resdir = "~/HollandLabShared/Sonali/MultiDisease_Paper/analysis/test_March_2022"
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_recount_dir = file.path(project_data_dir, "raw", "recount_brain")
+meta_v2 = get(load(file.path(raw_recount_dir, "recount_brain_v2.Rdata")))
+
+data_dir = file.path(project_data_dir, "processed", "log2_tpm_rse")
+output_dir = file.path(project_dir, "output")
+final_output_dir = file.path(output_dir, "final_processed")
+dir.create(final_output_dir, recursive = TRUE, showWarnings = FALSE)
+
+required_files = c(
+  file.path(data_dir, "TCGA_rse_gene.RData"),
+  file.path(data_dir, "GTEX_rse_gene.RData"),
+  file.path(data_dir, "other_brain_rse_gene_6_3_2020.RData")
+)
+missing_required = required_files[!file.exists(required_files)]
+if (length(missing_required) > 0) {
+  stop(
+    paste0(
+      "Missing required processed files in data/processed/log2_tpm_rse:\n- ",
+      paste(missing_required, collapse = "\n- "),
+      "\nPlease generate/download them before running the combine step."
+    )
+  )
+}
+
+flog.appender(appender.console(), name = "BRAINUMAP")
+flog.threshold(INFO, name = "BRAINUMAP")
+log_step = function(msg) {
+  futile.logger::flog.info(msg, name = "BRAINUMAP")
+  message(msg)
+}
+log_step("START: Combining TCGA, GTEx, and CGGA into harmonized matrix")
 tcga_meta = meta_v2[which(meta_v2[,"Dataset"]=="TCGA"), ]
 gtex_meta = meta_v2[ which(meta_v2[,"Dataset"]=="GTEX"), ]
 
@@ -132,6 +456,7 @@ gtex_mat = assay(gtex_rse)
 
 # CGGA
 other_rse = get(load(file.path(data_dir, "other_brain_rse_gene_6_3_2020.RData")))
+other_rse$sra_study_s <- "SRP027383"
 keep_study =c("SRP027383") # CGGA
 keep_col = which(other_rse$sra_study_s %in% keep_study)
 other_rse = other_rse[, keep_col]
@@ -178,10 +503,31 @@ table(finaldf$disease, useNA="always")
 table(finaldf$development, useNA="always")
 table(finaldf$tissue_site_1, useNA="always")
 
-# fix - metadata  for Gliomas
 
+
+
+
+
+```
+```{r}
+library(readxl)
+
+cgga_annot_path = "K:/PHO/AG Kerl/Victor/01_PBTA/00_Github/BRAINUMAP/data/raw/annotations/PMC4754110_s1_gbm_lgg_codel_status.xlsx"
+
+# Check sheet names first
+readxl::excel_sheets(cgga_annot_path)
+
+# Read first sheet (adjust sheet= if needed)
+tcga_codel = readxl::read_excel(cgga_annot_path, sheet = 1)
+
+
+```
+
+
+```{r}
+# fix - metadata  for Gliomas
 # add IDH status for TCGA : 
-tcga_codel = read.delim("PMC4754110_s1_gbm_lgg_codel_status.txt", header=T, stringsAsFactors=FALSE, skip=1, check.names=FALSE)
+
 tcga_codel = tcga_codel[,c("Case","Study", "IDH status", "1p/19q codeletion")]
 colnames(tcga_codel) = c("TCGA_case", "Study", "TCGA_idh", "TCGA_1p_19q_codel")
 tcga_codel[,3] = gsub("WT", "Wildtype", tcga_codel[,3])
@@ -201,8 +547,88 @@ finaldf$TCGA_Glioma_Grade[which(finaldf$disease=="TCGA-LGG" &
                              finaldf$clinical_stage_1=="Grade III")] = "3"
 
 
+
+```
+
+# CCGA
+```{r}
+
+library(futile.logger)
+
+project_dir      = normalizePath(".", winslash = "/", mustWork = FALSE)
+project_data_dir = file.path(project_dir, "data")
+raw_cgga_dir     = file.path(project_data_dir, "raw", "cgga")
+output_dir       = file.path(project_data_dir, "processed")
+dir.create(raw_cgga_dir, recursive = TRUE, showWarnings = FALSE)
+
+log_step = function(msg) { futile.logger::flog.info(msg); message(msg) }
+
+# --- Download both CGGA clinical files ---
+files = list(
+  list(
+    url     = "https://www.cgga.org.cn/download?file=download/20200506/CGGA.mRNAseq_693_clinical.20200506.txt.zip",
+    zip     = file.path(raw_cgga_dir, "CGGA_693_clinical.zip"),
+    pattern = "693_clinical",
+    batch   = "mRNAseq_693"
+  ),
+  list(
+    url     = "https://www.cgga.org.cn/download?file=download/20200506/CGGA.mRNAseq_325_clinical.20200506.txt.zip",
+    zip     = file.path(raw_cgga_dir, "CGGA_325_clinical.zip"),
+    pattern = "325_clinical",
+    batch   = "mRNAseq_325"
+  )
+)
+
+
+```
+
+```{r}
+clin_list = lapply(files, function(f) {
+
+  txt = list.files(raw_cgga_dir, pattern = f$pattern, full.names = TRUE, recursive = TRUE)
+  txt = txt[grepl("\\.txt$", txt)][1]
+  log_step(paste0("Reading: ", txt))
+  df = read.table(txt, header = TRUE, sep = "\t", quote = "", 
+                  stringsAsFactors = FALSE, check.names = FALSE)
+  df$batch = f$batch
+  df
+})
+```
+
+
+```{r}
+clin_list = lapply(files, function(f) {
+
+  txt = list.files(raw_cgga_dir, pattern = f$pattern, full.names = TRUE, recursive = TRUE)
+  txt = txt[grepl("\\.txt$", txt)][1]
+  log_step(paste0("Reading: ", txt))
+  df = read.table(txt, header = TRUE, sep = "\t", quote = "", 
+                  stringsAsFactors = FALSE, check.names = FALSE)
+  df$batch = f$batch
+  df
+})
+
+# --- Find common columns and merge ---
+common_cols = Reduce(intersect, lapply(clin_list, colnames))
+log_step(paste0("Common columns across batches: ", length(common_cols)))
+print(common_cols)
+
+# Merge on common columns (keeps batch column)
+cgga_combined = do.call(rbind, lapply(clin_list, function(df) df[, c(common_cols, "batch")]))
+
+log_step(paste0("Combined dimensions: ", nrow(cgga_combined), " samples x ", ncol(cgga_combined), " columns"))
+
+# --- Save ---
+out_path = file.path(raw_cgga_dir, "final_cgga_patient_information.txt")
+write.table(cgga_combined, file = out_path, sep = "\t", 
+            quote = FALSE, row.names = FALSE)
+log_step(paste0("Saved: ", out_path))
+```
+
+
+```{r}
 # CGGA : 
-cgga_key = read.delim("CGGA_data/final_cgga_patient_information.txt", 
+cgga_key = read.delim(out_path, 
                       header=T, stringsAsFactors = FALSE)
 rm_idx = which(is.na( match( cgga_key[,1], finaldf$sample_name_s) ))
 cgga_key = cgga_key[-c(rm_idx), ]
@@ -241,12 +667,10 @@ big_rse <- SummarizedExperiment(assays=SimpleList(counts=mat1),
 identical(colnames(big_rse), colData(big_rse)$run_s ) 
 
 # save the files. 
-write.table(finaldf, file.path(resdir,"data", "FULL_pca_tsne_umap_combined_analysis_1_28_2021.txt"), 
+write.table(finaldf, file.path(final_output_dir, "FULL_pca_tsne_umap_combined_analysis_1_28_2021.txt"), 
             sep ="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-save(big_rse, file =file.path(resdir, "data", "log2_tpm_big_rse_1_28_2021.Rdata"))
-
-
-
+save(big_rse, file =file.path(final_output_dir, "log2_tpm_big_rse_1_28_2021.Rdata"))
+log_step("END: Saved final harmonized metadata and SummarizedExperiment to output/final_processed")
 ```
 
 
@@ -263,8 +687,45 @@ library(rtracklayer)
 library(edgeR)
 library(SummarizedExperiment)
 
-d1 = "~/HollandLabShared/Sonali/OpenPBTA-analysis/data/release-v19-20210423"
-cbtn = readRDS(file.path(d1, "pbta-gene-counts-rsem-expected_count.stranded.rds"))
+if (!requireNamespace("futile.logger", quietly = TRUE)) {
+  stop("Package 'futile.logger' is required. Please run install.packages('futile.logger').")
+}
+library(futile.logger)
+
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+flog.appender(appender.console(), name = "BRAINUMAP")
+flog.threshold(INFO, name = "BRAINUMAP")
+log_step = function(msg) {
+  futile.logger::flog.info(msg, name = "BRAINUMAP")
+  message(msg)
+}
+log_step("START: Processing CBTN counts and matching to shared genes")
+
+openpbta_dir = file.path(normalizePath(".", winslash = "/", mustWork = FALSE), "data", "raw", "openpbta")
+d1 = file.path(openpbta_dir, "release-v23-20230115")
+dir.create(d1, recursive = TRUE, showWarnings = FALSE)
+
+cbtn_rds_path = file.path(d1, "pbta-gene-counts-rsem-expected_count.stranded.rds")
+if (!file.exists(cbtn_rds_path)) {
+  # Optional: set this URL if you have a direct downloadable source for the exact release file.
+  pbta_counts_url = Sys.getenv("PBTA_COUNTS_URL", unset = "")
+  if (nzchar(pbta_counts_url)) {
+    log_step("CBTN counts file missing locally. Attempting download from PBTA_COUNTS_URL.")
+    downloader::download(pbta_counts_url, destfile = cbtn_rds_path, mode = "wb")
+  }
+}
+
+if (!file.exists(cbtn_rds_path)) {
+  stop(
+    paste0(
+      "Missing required input file: ", cbtn_rds_path, "\n",
+      "Place pbta-gene-counts-rsem-expected_count.stranded.rds in that folder, ",
+      "or set environment variable PBTA_COUNTS_URL to a direct download URL and rerun."
+    )
+  )
+}
+
+cbtn = readRDS(cbtn_rds_path)
 temp = cbtn[,1] # first column looks like this : ENSG00000000003.14_TSPAN6
 gene_id = sapply(strsplit(temp, "[_]"), function(x) x[1])
 length(gene_id)
@@ -278,7 +739,17 @@ cbtn = cbtn[,-1]
 dim(cbtn) # 58302   977
 
 
-gtf = import("~/HollandLabShared/Sonali/OpenPBTA-analysis/data/gencode.v27.primary_assembly.annotation.gtf.gz")
+gtf_v27_path = file.path(openpbta_dir, "gencode.v27.primary_assembly.annotation.gtf.gz")
+if (!file.exists(gtf_v27_path)) {
+  log_step("Missing gencode.v27.primary_assembly.annotation.gtf.gz - downloading to data/raw/openpbta")
+  downloader::download(
+    url = "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_27/gencode.v27.primary_assembly.annotation.gtf.gz",
+    destfile = gtf_v27_path,
+    mode = "wb"
+  )
+}
+
+gtf = import(gtf_v27_path)
 gtf = gtf[which(gtf$type=="gene") , ]
 cs = intersect( rownames(cbtn), gtf$gene_id)
 length(cs)
@@ -289,8 +760,10 @@ identical(gtf$gene_id, rownames(cbtn)) # TRUE
 
 # KEEP same genes as my brain-umap
 
-resdir = "~/HollandLabShared/Sonali/MultiDisease_Paper/analysis/test_March_2022"
-big_rse = get(load(file.path(resdir,"data", "log2_tpm_big_rse_1_28_2021.Rdata")))
+project_dir = normalizePath(".", winslash = "/", mustWork = FALSE)
+final_output_dir = file.path(project_dir, "output", "final_processed")
+dir.create(final_output_dir, recursive = TRUE, showWarnings = FALSE)
+big_rse = get(load(file.path(final_output_dir, "log2_tpm_big_rse_1_28_2021.Rdata")))
 big_mat = assay(big_rse)
 
 common_genes= intersect( rowRanges(big_rse)$gencode_gene_name,gtf$gene_name)
@@ -314,6 +787,7 @@ tpm_data =  apply(rpkm_data, 2, function(x){
 })
 log2_tpm_cbtn  = log2(tpm_data +1)
 
-saveRDS(log2_tpm_cbtn, file.path(resdir, "data","log2_tpm_cbtn.rds") )
+saveRDS(log2_tpm_cbtn, file.path(final_output_dir, "log2_tpm_cbtn.rds") )
+log_step("END: Saved CBTN log2(TPM+1) matrix to output/final_processed/log2_tpm_cbtn.rds")
 
 ```

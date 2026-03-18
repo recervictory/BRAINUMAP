@@ -1,0 +1,6 @@
+# Data Files and Directories
+data/
+output/
+*.csv
+*.RData
+
